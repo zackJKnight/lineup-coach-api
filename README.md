@@ -1,12 +1,18 @@
-# Token Service API
+# Token & Player Service API
 
-This repository implements a minimal JSON Web Token (JWT) service written in
-[TypeScript](https://www.typescriptlang.org/) for the
-[Deno](https://deno.com/) runtime.  It exposes a single `/token` endpoint
-for generating tokens and a `/protected` endpoint that requires a valid
-token to access.  The service uses the
-[Oak](https://deno.land/x/oak) web framework and
-[djwt](https://deno.land/x/djwt) for signing and verifying JWTs.
+This repository implements a minimal JSON Web Token (JWT) service
+written in [TypeScript](https://www.typescriptlang.org/) for the
+[Deno](https://deno.com/) runtime **and** a simple CRUD API for
+managing player data.  Originally the project exposed only a `/token`
+endpoint for generating tokens and a `/protected` endpoint that
+required a valid token to access.  It has since been extended with a
+`/players` resource backed by the built‑in [Deno KV
+database](https://docs.deno.com/deploy/kv/manual/on_deploy) which
+persists JSON objects in a globally replicated key‑value store.
+
+The service uses the [Oak](https://deno.land/x/oak) web framework
+for routing, [djwt](https://deno.land/x/djwt) for signing and
+verifying JWTs, and the native `Deno.openKv()` API for persistence.
 
 ## Why version‑pinned imports?
 
@@ -48,8 +54,10 @@ development tools such as Swagger UI or Postman.
 - **`utils/auth.ts`** – helper functions for generating and verifying
   tokens.  It demonstrates how to create a CryptoKey from a secret
   and how to call `makeJwt` and `validateJwt`【660786321715216†L115-L130】【660786321715216†L133-L150】.
-- **`main.ts`** – the entrypoint that configures the router and
-  defines the `/token` and `/protected` endpoints.
+- **`main.ts`** – the entrypoint that configures the router.  It
+  defines the `/token` and `/protected` endpoints for token
+  generation and verification **and** implements CRUD handlers for
+  `/players` using Deno KV.
 - **`openapi.yaml`** – the OpenAPI 3.1 specification for the
   service.
 - **`.github/workflows/deploy.yml`** – a GitHub Actions workflow that
@@ -107,6 +115,64 @@ before running the server.
 
    If the token is missing or invalid the service responds with a
    401 error and an explanatory message.
+
+### Managing players
+
+This project also exposes a simple REST API for managing player
+records.  Players correspond to the `Player` interface used in the
+LineupCoach Angular client.  Each player has an `id`, `firstName`,
+`lastName`, optional `isPresent` flag, a `positionPreferenceRank`
+object with an ordered list of preferred positions, a list of
+`startingPositionIds`, an optional `placementScore`, an optional
+`fitScore`, and a list of `benchIds`.  Data is persisted in Deno KV
+under the key space `['players', id]`.
+
+#### Create a player
+
+Send a POST request to `/players` with a JSON body containing the
+player fields (excluding `id`).  The server generates a unique
+identifier if one is not provided:
+
+```sh
+curl -X POST http://localhost:8000/players \
+  -H "Content-Type: application/json" \
+  -d '{
+    "firstName": "Alex",
+    "lastName": "Morgan",
+    "positionPreferenceRank": { "ranking": ["forward", "mid"] },
+    "startingPositionIds": [1, 2],
+    "benchIds": []
+  }'
+```
+
+#### List players
+
+Retrieve all players by sending a GET request to `/players`:
+
+```sh
+curl http://localhost:8000/players
+```
+
+#### Get, update and delete a player
+
+Use the player’s `id` in the path:
+
+```sh
+# Get a player
+curl http://localhost:8000/players/<player-id>
+
+# Update a player
+curl -X PUT http://localhost:8000/players/<player-id> \
+  -H "Content-Type: application/json" \
+  -d '{ "firstName": "Alexandra", "lastName": "Morgan", "positionPreferenceRank": { "ranking": ["forward"] }, "startingPositionIds": [1], "benchIds": [] }'
+
+# Delete a player
+curl -X DELETE http://localhost:8000/players/<player-id>
+```
+
+These endpoints do not require authentication.  In a real
+application you would typically protect them with JWTs by adding
+middleware similar to the `/protected` route.
 
 ## Deploying to Deno Deploy
 

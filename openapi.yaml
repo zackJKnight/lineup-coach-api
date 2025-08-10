@@ -1,16 +1,17 @@
 openapi: 3.1.0
 info:
-  title: Token Service API
-  version: 1.0.0
+  title: Token & Player Service API
+  version: 1.1.0
   description: |
-    This OpenAPI specification describes a simple JWT‑based token service
-    implemented with the [Oak](https://deno.land/x/oak) framework for
-    Deno.  Clients can obtain a signed JSON Web Token (JWT) by
-    supplying a username to the **POST /token** endpoint.  The
-    returned token must then be supplied as a bearer credential when
-    calling protected endpoints.  A valid token allows access to
-    **GET /protected**, which simply returns a greeting.  The token is
-    signed using the HS256 algorithm and expires after one hour.
+    This OpenAPI specification describes a token service combined with a
+    simple player management API.  Clients can obtain a signed JSON Web
+    Token (JWT) by supplying a username to the **POST /token** endpoint.
+    The token must then be supplied as a bearer credential when calling
+    protected endpoints such as **GET /protected**.  In addition to the
+    authentication endpoints, this API exposes CRUD operations for
+    managing players inspired by the [LineupCoach](https://github.com/zackJKnight/Lineup.Coach)
+    Angular client.  Player records are persisted in [Deno KV] which
+    provides a globally distributed, strongly consistent key‑value store.
 servers:
   - url: https://{baseUrl}
     description: Deployed service endpoint
@@ -105,9 +106,221 @@ paths:
                     type: string
               example:
                 error: Invalid or expired token
+
+  /players:
+    get:
+      summary: List all players
+      description: |
+        Retrieve an array of all player records stored in the database.  Each
+        element in the response includes the player's unique `id` and other
+        properties defined by the Player schema.  No authentication is
+        required to call this endpoint.
+      responses:
+        '200':
+          description: An array of players
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Player'
+    post:
+      summary: Create a new player
+      description: |
+        Create a new player.  The request body should include all required
+        Player fields except for `id`.  The server generates a unique
+        identifier if one is not provided.  On success the response
+        includes the newly created player with its assigned `id`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPlayer'
+      responses:
+        '201':
+          description: Player created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Player'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /players/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the player
+    get:
+      summary: Retrieve a player by ID
+      description: |
+        Fetch a single player record by its `id`.  Returns a 404 error
+        if no player exists with the specified identifier.
+      responses:
+        '200':
+          description: A single player
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Player'
+        '404':
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+    put:
+      summary: Update an existing player
+      description: |
+        Replace an existing player record with the data supplied in the
+        request body.  The player must already exist; otherwise a 404
+        error is returned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPlayer'
+      responses:
+        '200':
+          description: Player updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Player'
+        '404':
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+    delete:
+      summary: Delete a player
+      description: |
+        Remove a player from the database.  If the player does not
+        exist the server returns a 404 error.  On successful deletion
+        the response has no content.
+      responses:
+        '204':
+          description: Player deleted
+        '404':
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
 components:
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
+  schemas:
+    # Schema representing a complete player record stored in the database.
+    Player:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier assigned by the server
+        firstName:
+          type: string
+        lastName:
+          type: string
+        isPresent:
+          type: boolean
+          nullable: true
+        positionPreferenceRank:
+          type: object
+          properties:
+            ranking:
+              type: array
+              items:
+                type: string
+              description: Ordered list of position names
+          required:
+            - ranking
+        startingPositionIds:
+          type: array
+          items:
+            type: integer
+        placementScore:
+          type: number
+          nullable: true
+        fitScore:
+          type: number
+          nullable: true
+        benchIds:
+          type: array
+          items:
+            type: integer
+      required:
+        - id
+        - firstName
+        - lastName
+        - positionPreferenceRank
+        - startingPositionIds
+        - benchIds
+
+    # Schema used when creating or updating a player.  The `id` field is
+    # omitted because it is generated by the server.
+    NewPlayer:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        isPresent:
+          type: boolean
+          nullable: true
+        positionPreferenceRank:
+          type: object
+          properties:
+            ranking:
+              type: array
+              items:
+                type: string
+          required:
+            - ranking
+        startingPositionIds:
+          type: array
+          items:
+            type: integer
+        placementScore:
+          type: number
+          nullable: true
+        fitScore:
+          type: number
+          nullable: true
+        benchIds:
+          type: array
+          items:
+            type: integer
+      required:
+        - firstName
+        - lastName
+        - positionPreferenceRank
+        - startingPositionIds
+        - benchIds
