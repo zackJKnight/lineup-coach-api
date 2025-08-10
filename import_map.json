@@ -1,10 +1,6 @@
 {
   "imports": {
     "oak": "https://deno.land/x/oak@v12.6.1/mod.ts",
-    // Map djwt's module entry point.  Using the `mod.ts` entrypoint
-    // provides access to the high‑level `create`, `verify` and
-    // `getNumericDate` helpers used by the application.  See
-    // https://deno.land/x/djwt@v2.8 for API details.
     "djwt/mod": "https://deno.land/x/djwt@v2.8/mod.ts"
   }
 }
