@@ -9,7 +9,9 @@
  */
 
 import { Application, Router, type Context } from "./deps.ts";
-import { generateToken, verifyToken } from "./utils/auth.ts";
+// Import the token helpers from the top‑level auth module instead of the utils
+// directory.  The utils folder is not used in this simplified project structure.
+import { generateToken, verifyToken } from "./auth.ts";
 
 /**
  * Extract the bearer token from an HTTP Authorization header.
