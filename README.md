@@ -239,8 +239,8 @@ will need to replace the `project` field in
 
 To deploy manually:
 
-1. Create a new project in Deno Deploy and choose “Import from
-   GitHub.”
+1. Create a new project in Deno Deploy and choose “Import from the
+   GitHubs.”
 2. Select your repository and branch.  Deno Deploy will detect the
    entrypoint (`main.ts`) and automatically deploy it.  Commits to
    the `main` branch will trigger new deployments.
