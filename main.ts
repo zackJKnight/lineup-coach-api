@@ -212,6 +212,428 @@ router.delete("/players/:id", async (ctx: Context) => {
 });
 
 // ---------------------------------------------------------------------------
+// Team management endpoints
+//
+// A team represents a collection of players.  For now the only
+// attribute defined by the Angular client is a `name` field, but
+// additional properties can be added over time.  Teams are stored
+// under the `['teams', id]` prefix in Deno KV.  As with players, the
+// client may provide an `id` when creating a team; otherwise a
+// UUID is generated.
+
+// GET /teams – list all teams
+router.get("/teams", async (ctx: Context) => {
+  const teams: unknown[] = [];
+  for await (const entry of kv.list({ prefix: ["teams"] })) {
+    const [, id] = entry.key as [string, string];
+    teams.push({ id, ...(entry.value as Record<string, unknown>) });
+  }
+  ctx.response.body = teams;
+});
+
+// POST /teams – create a new team
+router.post("/teams", async (ctx: Context) => {
+  const body = ctx.request.body({ type: "json" });
+  const data = await body.value;
+  let teamId: string = data?.id;
+  if (!teamId || typeof teamId !== "string") {
+    teamId = crypto.randomUUID();
+  }
+  const { id: _, ...team } = data ?? {};
+  await kv.set(["teams", teamId], team);
+  ctx.response.status = 201;
+  ctx.response.body = { id: teamId, ...team };
+});
+
+// GET /teams/:id – retrieve a team by ID
+router.get("/teams/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing team id" };
+    return;
+  }
+  const entry = await kv.get(["teams", id]);
+  if (!entry.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Team not found" };
+    return;
+  }
+  ctx.response.body = { id, ...(entry.value as Record<string, unknown>) };
+});
+
+// PUT /teams/:id – update an existing team
+router.put("/teams/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing team id" };
+    return;
+  }
+  const existing = await kv.get(["teams", id]);
+  if (!existing.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Team not found" };
+    return;
+  }
+  const body = ctx.request.body({ type: "json" });
+  const data = await body.value;
+  const { id: _, ...team } = data ?? {};
+  await kv.set(["teams", id], team);
+  ctx.response.body = { id, ...team };
+});
+
+// DELETE /teams/:id – delete a team
+router.delete("/teams/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing team id" };
+    return;
+  }
+  const existing = await kv.get(["teams", id]);
+  if (!existing.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Team not found" };
+    return;
+  }
+  await kv.delete(["teams", id]);
+  ctx.response.status = 204;
+});
+
+// ---------------------------------------------------------------------------
+// Position management endpoints
+//
+// Positions represent spots on the field (e.g. Goalkeeper, Defender).
+// Each position may belong to a particular period via `periodId`
+// and optionally track fit scores for each player.  We follow the
+// same CRUD pattern used for players and teams.  Positions are
+// stored under the `['positions', id]` prefix.
+
+router.get("/positions", async (ctx: Context) => {
+  const positions: unknown[] = [];
+  for await (const entry of kv.list({ prefix: ["positions"] })) {
+    const [, id] = entry.key as [string, string];
+    positions.push({ id, ...(entry.value as Record<string, unknown>) });
+  }
+  ctx.response.body = positions;
+});
+
+router.post("/positions", async (ctx: Context) => {
+  const body = ctx.request.body({ type: "json" });
+  const data = await body.value;
+  let posId: string = data?.id;
+  if (!posId || typeof posId !== "string") {
+    posId = crypto.randomUUID();
+  }
+  const { id: _, ...pos } = data ?? {};
+  await kv.set(["positions", posId], pos);
+  ctx.response.status = 201;
+  ctx.response.body = { id: posId, ...pos };
+});
+
+router.get("/positions/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing position id" };
+    return;
+  }
+  const entry = await kv.get(["positions", id]);
+  if (!entry.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Position not found" };
+    return;
+  }
+  ctx.response.body = { id, ...(entry.value as Record<string, unknown>) };
+});
+
+router.put("/positions/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing position id" };
+    return;
+  }
+  const existing = await kv.get(["positions", id]);
+  if (!existing.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Position not found" };
+    return;
+  }
+  const body = ctx.request.body({ type: "json" });
+  const data = await body.value;
+  const { id: _, ...pos } = data ?? {};
+  await kv.set(["positions", id], pos);
+  ctx.response.body = { id, ...pos };
+});
+
+router.delete("/positions/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing position id" };
+    return;
+  }
+  const existing = await kv.get(["positions", id]);
+  if (!existing.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Position not found" };
+    return;
+  }
+  await kv.delete(["positions", id]);
+  ctx.response.status = 204;
+});
+
+// ---------------------------------------------------------------------------
+// Game management endpoints
+//
+// Games represent individual matches.  Each game may include
+// properties such as opponent, date/time, location and notes.  Games
+// are stored under the `['games', id]` prefix.
+
+router.get("/games", async (ctx: Context) => {
+  const games: unknown[] = [];
+  for await (const entry of kv.list({ prefix: ["games"] })) {
+    const [, id] = entry.key as [string, string];
+    games.push({ id, ...(entry.value as Record<string, unknown>) });
+  }
+  ctx.response.body = games;
+});
+
+router.post("/games", async (ctx: Context) => {
+  const body = ctx.request.body({ type: "json" });
+  const data = await body.value;
+  let gameId: string = data?.id;
+  if (!gameId || typeof gameId !== "string") {
+    gameId = crypto.randomUUID();
+  }
+  const { id: _, ...game } = data ?? {};
+  await kv.set(["games", gameId], game);
+  ctx.response.status = 201;
+  ctx.response.body = { id: gameId, ...game };
+});
+
+router.get("/games/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing game id" };
+    return;
+  }
+  const entry = await kv.get(["games", id]);
+  if (!entry.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Game not found" };
+    return;
+  }
+  ctx.response.body = { id, ...(entry.value as Record<string, unknown>) };
+});
+
+router.put("/games/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing game id" };
+    return;
+  }
+  const existing = await kv.get(["games", id]);
+  if (!existing.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Game not found" };
+    return;
+  }
+  const body = ctx.request.body({ type: "json" });
+  const data = await body.value;
+  const { id: _, ...game } = data ?? {};
+  await kv.set(["games", id], game);
+  ctx.response.body = { id, ...game };
+});
+
+router.delete("/games/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing game id" };
+    return;
+  }
+  const existing = await kv.get(["games", id]);
+  if (!existing.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Game not found" };
+    return;
+  }
+  await kv.delete(["games", id]);
+  ctx.response.status = 204;
+});
+
+// ---------------------------------------------------------------------------
+// Period management endpoints
+//
+// Periods represent halves, quarters or innings within a game.  Each
+// period must reference a parent game via `gameId` and may include a
+// numerical `number` field.  Periods are stored under
+// `['periods', id]`.
+
+router.get("/periods", async (ctx: Context) => {
+  const periods: unknown[] = [];
+  for await (const entry of kv.list({ prefix: ["periods"] })) {
+    const [, id] = entry.key as [string, string];
+    periods.push({ id, ...(entry.value as Record<string, unknown>) });
+  }
+  ctx.response.body = periods;
+});
+
+router.post("/periods", async (ctx: Context) => {
+  const body = ctx.request.body({ type: "json" });
+  const data = await body.value;
+  let periodId: string = data?.id;
+  if (!periodId || typeof periodId !== "string") {
+    periodId = crypto.randomUUID();
+  }
+  const { id: _, ...period } = data ?? {};
+  await kv.set(["periods", periodId], period);
+  ctx.response.status = 201;
+  ctx.response.body = { id: periodId, ...period };
+});
+
+router.get("/periods/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing period id" };
+    return;
+  }
+  const entry = await kv.get(["periods", id]);
+  if (!entry.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Period not found" };
+    return;
+  }
+  ctx.response.body = { id, ...(entry.value as Record<string, unknown>) };
+});
+
+router.put("/periods/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing period id" };
+    return;
+  }
+  const existing = await kv.get(["periods", id]);
+  if (!existing.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Period not found" };
+    return;
+  }
+  const body = ctx.request.body({ type: "json" });
+  const data = await body.value;
+  const { id: _, ...period } = data ?? {};
+  await kv.set(["periods", id], period);
+  ctx.response.body = { id, ...period };
+});
+
+router.delete("/periods/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing period id" };
+    return;
+  }
+  const existing = await kv.get(["periods", id]);
+  if (!existing.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Period not found" };
+    return;
+  }
+  await kv.delete(["periods", id]);
+  ctx.response.status = 204;
+});
+
+// ---------------------------------------------------------------------------
+// Lineup management endpoints
+//
+// A lineup represents the assignment of players to positions for a
+// given team, game and optional period.  The `assignments` object
+// maps `positionId` to `playerId`.  Lineups are stored under
+// `['lineups', id]`.
+
+router.get("/lineups", async (ctx: Context) => {
+  const lineups: unknown[] = [];
+  for await (const entry of kv.list({ prefix: ["lineups"] })) {
+    const [, id] = entry.key as [string, string];
+    lineups.push({ id, ...(entry.value as Record<string, unknown>) });
+  }
+  ctx.response.body = lineups;
+});
+
+router.post("/lineups", async (ctx: Context) => {
+  const body = ctx.request.body({ type: "json" });
+  const data = await body.value;
+  let lineupId: string = data?.id;
+  if (!lineupId || typeof lineupId !== "string") {
+    lineupId = crypto.randomUUID();
+  }
+  const { id: _, ...lineup } = data ?? {};
+  await kv.set(["lineups", lineupId], lineup);
+  ctx.response.status = 201;
+  ctx.response.body = { id: lineupId, ...lineup };
+});
+
+router.get("/lineups/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing lineup id" };
+    return;
+  }
+  const entry = await kv.get(["lineups", id]);
+  if (!entry.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Lineup not found" };
+    return;
+  }
+  ctx.response.body = { id, ...(entry.value as Record<string, unknown>) };
+});
+
+router.put("/lineups/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing lineup id" };
+    return;
+  }
+  const existing = await kv.get(["lineups", id]);
+  if (!existing.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Lineup not found" };
+    return;
+  }
+  const body = ctx.request.body({ type: "json" });
+  const data = await body.value;
+  const { id: _, ...lineup } = data ?? {};
+  await kv.set(["lineups", id], lineup);
+  ctx.response.body = { id, ...lineup };
+});
+
+router.delete("/lineups/:id", async (ctx: Context) => {
+  const id = ctx.params.id;
+  if (!id) {
+    ctx.response.status = 400;
+    ctx.response.body = { error: "Missing lineup id" };
+    return;
+  }
+  const existing = await kv.get(["lineups", id]);
+  if (!existing.value) {
+    ctx.response.status = 404;
+    ctx.response.body = { error: "Lineup not found" };
+    return;
+  }
+  await kv.delete(["lineups", id]);
+  ctx.response.status = 204;
+});
+
+// ---------------------------------------------------------------------------
 // OAuth routes
 //
 // Initiate a Google sign‑in by redirecting the client to Google.  The

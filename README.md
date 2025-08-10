@@ -3,19 +3,25 @@
 This repository implements a minimal JSON Web Token (JWT) service
 written in [TypeScript](https://www.typescriptlang.org/) for the
 [Deno](https://deno.com/) runtime.  Beyond token issuance, the
-project now includes a simple CRUD API for managing player data
-**and** Google sign‑in via OAuth.  Originally the project exposed only
+project now includes a full CRUD API for managing **players**, **teams**,
+**positions**, **games**, **periods**, and **lineups**, along with
+Google sign‑in via OAuth.  Originally the project exposed only
 a `/token` endpoint for generating tokens and a `/protected` endpoint
 that required a valid token to access.  It has since been extended
 with:
 
 * a `/players` resource backed by the built‑in [Deno KV
   database](https://docs.deno.com/deploy/kv/manual/on_deploy) which
-  persists JSON objects in a globally replicated key‑value store; and
+  persists JSON objects in a globally replicated key‑value store;
+* additional resources `/teams`, `/positions`, `/games`, `/periods` and
+  `/lineups`, each following the same pattern as players with list,
+  create, retrieve, update and delete operations;
 * OAuth endpoints for Google sign‑in that use the
   [`@deno/kv‑oauth`](https://deno.land/x/kv_oauth) library to store
   session state in Deno KV and manage the OAuth2 authorization code
-  flow.
+  flow; and
+* an interactive Swagger UI at `/docs` that lets you explore and test
+  all of the API endpoints.
 
 The service uses the [Oak](https://deno.land/x/oak) web framework
 for routing, [djwt](https://deno.land/x/djwt) for signing and
@@ -68,10 +74,12 @@ other tools like Postman if you prefer.
 - **`utils/auth.ts`** – helper functions for generating and verifying
   tokens.  It demonstrates how to create a CryptoKey from a secret
   and how to call `makeJwt` and `validateJwt`【660786321715216†L115-L130】【660786321715216†L133-L150】.
-- **`main.ts`** – the entrypoint that configures the router.  It
+ - **`main.ts`** – the entrypoint that configures the router.  It
   defines the `/token` and `/protected` endpoints for token
   generation and verification **and** implements CRUD handlers for
-  `/players` using Deno KV.
+  `/players`, `/teams`, `/positions`, `/games`, `/periods` and `/lineups`
+  using Deno KV.  It also integrates Google OAuth and exposes the
+  OpenAPI spec and Swagger UI endpoints.
 - **`openapi.yaml`** – the OpenAPI 3.1 specification for the
   service.
 - **`.github/workflows/deploy.yml`** – a GitHub Actions workflow that
@@ -189,6 +197,56 @@ curl -X DELETE http://localhost:8000/players/<player-id>
 These endpoints do not require authentication.  In a real
 application you would typically protect them with JWTs by adding
 middleware similar to the `/protected` route.
+
+### Managing teams, positions, games, periods and lineups
+
+Beyond players, the API exposes additional resources reflecting the
+LineupCoach domain model.  Each resource follows the same CRUD
+pattern and is persisted in Deno KV under its own namespace.  The
+table below summarises the resources and their prefixes:
+
+| Resource      | Namespace prefix      | Description                                   |
+|---------------|-----------------------|-----------------------------------------------|
+| `/teams`      | `['teams', id]`       | Teams group players together and have a name. |
+| `/positions`  | `['positions', id]`   | Positions represent spots on the field.        |
+| `/games`      | `['games', id]`       | Games correspond to matches in a season.       |
+| `/periods`    | `['periods', id]`     | Periods subdivide games into segments.         |
+| `/lineups`    | `['lineups', id]`     | Lineups map positions to players for a game.   |
+
+Each of these endpoints supports:
+
+* `GET /resource` – list all records;
+* `POST /resource` – create a new record (omit `id` to auto‑generate one);
+* `GET /resource/{id}` – fetch a record by ID;
+* `PUT /resource/{id}` – replace an existing record; and
+* `DELETE /resource/{id}` – remove a record.
+
+For example, to create a new team:
+
+```sh
+curl -X POST http://localhost:8000/teams \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "U12 Blue Tigers" }'
+```
+
+And to create a lineup that assigns players to positions for a game:
+
+```sh
+curl -X POST http://localhost:8000/lineups \
+  -H "Content-Type: application/json" \
+  -d '{
+    "teamId": "<team-id>",
+    "gameId": "<game-id>",
+    "periodId": null,
+    "assignments": {
+      "<position-id>": "<player-id>",
+      "<another-position-id>": "<another-player-id>"
+    }
+  }'
+```
+
+All management endpoints are unauthenticated by default for simplicity,
+but you can add middleware to protect them using JWTs if needed.
 
 ### Google sign‑in (OAuth)
 

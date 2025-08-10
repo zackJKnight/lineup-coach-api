@@ -1,23 +1,21 @@
 openapi: 3.1.0
 info:
   title: Token & Player Service API
-  version: 1.2.0
+  version: 1.3.0
   description: |
     This OpenAPI specification describes a token service combined with a
-    simple player management API and Google OAuth integration.  Clients
-    can obtain a signed JSON Web Token (JWT) by supplying a username to
-    the **POST /token** endpoint; the token must then be supplied as a
-    bearer credential when calling protected endpoints such as
-    **GET /protected**.  For federated login the service supports
-    Google OAuth via the **/oauth/signin** and **/oauth/callback**
-    endpoints.  Sessions are stored in Deno KV and a helper endpoint
-    **/session** returns the current session identifier.  In
-    addition to authentication, the API exposes CRUD operations for
-    managing players inspired by the
-    [LineupCoach](https://github.com/zackJKnight/Lineup.Coach) Angular
-    client.  Player records and session data are persisted in
-    [Deno KV] which provides a globally distributed, strongly consistent
-    key‑value store.
+    simple player management API, team management, position management,
+    game scheduling, period segmentation, lineup creation, Google OAuth integration,
+    and session handling using Deno KV. Clients can obtain a signed JSON
+    Web Token (JWT) by supplying a username to the **POST /token**
+    endpoint; the token must then be supplied as a bearer credential when
+    calling protected endpoints such as **GET /protected**. For federated
+    login the service supports Google OAuth via the **/oauth/signin** and
+    **/oauth/callback** endpoints. Sessions are stored in Deno KV and a helper
+    endpoint **/session** returns the current session identifier. In addition
+    to authentication, the API exposes CRUD operations for managing players,
+    teams, positions, games, periods and lineups. All records are persisted in
+    Deno KV, which provides a globally distributed, strongly consistent key‑value store.
 servers:
   - url: https://{baseUrl}
     description: Deployed service endpoint
@@ -113,7 +111,6 @@ paths:
                     type: string
               example:
                 error: Invalid or expired token
-
   /players:
     get:
       summary: List all players
@@ -160,7 +157,6 @@ paths:
                 properties:
                   error:
                     type: string
-
   /players/{id}:
     parameters:
       - in: path
@@ -236,15 +232,570 @@ paths:
                 properties:
                   error:
                     type: string
+  /teams:
+    get:
+      summary: List all teams
+      description: |
+        Retrieve an array of all team records stored in the database.  Each
+        element in the response includes the team's unique `id` and its
+        properties.  No authentication is required to call this endpoint.
+      responses:
+        '200':
+          description: An array of teams
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Team'
+    post:
+      summary: Create a new team
+      description: |
+        Create a new team.  The request body must include a `name` field.
+        If no `id` is supplied the server will generate a UUID.  Returns the
+        created team with its assigned `id`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewTeam'
+      responses:
+        '201':
+          description: Team created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+  /teams/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the team
+    get:
+      summary: Retrieve a team by ID
+      responses:
+        '200':
+          description: A single team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '404':
+          description: Team not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Team not found
+    put:
+      summary: Replace a team
+      description: |
+        Replace an existing team.  The request body must contain the full
+        team object (except for the `id`, which is taken from the path).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewTeam'
+      responses:
+        '200':
+          description: Updated team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '404':
+          description: Team not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+    delete:
+      summary: Delete a team
+      responses:
+        '204':
+          description: Team deleted successfully
+        '404':
+          description: Team not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /positions:
+    get:
+      summary: List all positions
+      responses:
+        '200':
+          description: An array of positions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Position'
+    post:
+      summary: Create a new position
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPosition'
+      responses:
+        '201':
+          description: Position created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Position'
+  /positions/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the position
+    get:
+      summary: Retrieve a position by ID
+      responses:
+        '200':
+          description: A single position
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Position'
+        '404':
+          description: Position not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Position not found
+    put:
+      summary: Replace a position
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPosition'
+      responses:
+        '200':
+          description: Updated position
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Position'
+        '404':
+          description: Position not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Position not found
+    delete:
+      summary: Delete a position
+      responses:
+        '204':
+          description: Position deleted successfully
+        '404':
+          description: Position not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Position not found
+  /games:
+    get:
+      summary: List all games
+      responses:
+        '200':
+          description: An array of games
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Game'
+    post:
+      summary: Create a new game
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewGame'
+      responses:
+        '201':
+          description: Game created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+  /games/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the game
+    get:
+      summary: Retrieve a game by ID
+      responses:
+        '200':
+          description: A single game
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Game not found
+    put:
+      summary: Replace a game
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewGame'
+      responses:
+        '200':
+          description: Updated game
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Game'
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Game not found
+    delete:
+      summary: Delete a game
+      responses:
+        '204':
+          description: Game deleted successfully
+        '404':
+          description: Game not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+  /periods:
+    get:
+      summary: List all periods
+      responses:
+        '200':
+          description: An array of periods
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Period'
+    post:
+      summary: Create a new period
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPeriod'
+      responses:
+        '201':
+          description: Period created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Period'
+  /periods/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the period
+    get:
+      summary: Retrieve a period by ID
+      responses:
+        '200':
+          description: A single period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Period'
+        '404':
+          description: Period not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Period not found
+    put:
+      summary: Replace a period
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPeriod'
+      responses:
+        '200':
+          description: Updated period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Period'
+        '404':
+          description: Period not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Period not found
+    delete:
+      summary: Delete a period
+      responses:
+        '204':
+          description: Period deleted successfully
+        '404':
+          description: Period not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Period not found
+  /lineups:
+    get:
+      summary: List all lineups
+      responses:
+        '200':
+          description: An array of lineups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Lineup'
+    post:
+      summary: Create a new lineup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewLineup'
+      responses:
+        '201':
+          description: Lineup created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lineup'
+  /lineups/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        description: Unique identifier of the lineup
+    get:
+      summary: Retrieve a lineup by ID
+      responses:
+        '200':
+          description: A single lineup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lineup'
+        '404':
+          description: Lineup not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Lineup not found
+    put:
+      summary: Replace a lineup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewLineup'
+      responses:
+        '200':
+          description: Updated lineup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lineup'
+        '404':
+          description: Lineup not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Lineup not found
+    delete:
+      summary: Delete a lineup
+      responses:
+        '204':
+          description: Lineup deleted successfully
+        '404':
+          description: Lineup not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Lineup not found
+  /oauth/signin:
+    get:
+      summary: Initiate Google OAuth sign‑in
+      description: |
+        Redirect the client to Google's OAuth consent page to start
+        the authentication flow.  The server constructs an
+        authorization request using the client ID defined in the
+        `GOOGLE_CLIENT_ID` environment variable, the redirect URI
+        defined in `GOOGLE_REDIRECT_URI`, and the default scopes
+        configured by the service.  On success the response is a 302
+        redirect to Google.  No authentication is required to call
+        this endpoint.
+      responses:
+        '302':
+          description: Redirect to Google for user consent
+          headers:
+            Location:
+              description: URL of the Google authorization endpoint
+              schema:
+                type: string
+  /oauth/callback:
+    get:
+      summary: Complete Google OAuth callback
+      description: |
+        Google redirects back to this endpoint after the user grants
+        permission.  The server exchanges the authorization code for
+        access tokens and stores session information in Deno KV.  On
+        success the response is a redirect back to the application
+        root.  The server also sets a signed session cookie that
+        identifies the authenticated user.
+      responses:
+        '302':
+          description: Redirect back to the application after completing OAuth
+          headers:
+            Set-Cookie:
+              description: Session cookie containing an opaque session ID
+              schema:
+                type: string
+  /oauth/signout:
+    get:
+      summary: Sign out the current user
+      description: |
+        Invalidate the current session by removing it from Deno KV and
+        clearing the session cookie.  Always succeeds whether or not a
+        session exists.
+      responses:
+        '204':
+          description: Session cleared
+  /session:
+    get:
+      summary: Retrieve the current session identifier
+      description: |
+        Return the opaque session ID for the current user if logged in.
+        If no session is active the `sessionId` property will be
+        `null`.  Clients can use this endpoint to determine whether
+        they are authenticated.
+      responses:
+        '200':
+          description: Session information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:
+                    type: string
+                    nullable: true
 components:
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-
   schemas:
-    # Schema representing a complete player record stored in the database.
     Player:
       type: object
       properties:
@@ -265,7 +816,6 @@ components:
               type: array
               items:
                 type: string
-              description: Ordered list of position names
           required:
             - ranking
         startingPositionIds:
@@ -289,79 +839,6 @@ components:
         - positionPreferenceRank
         - startingPositionIds
         - benchIds
-
-  /oauth/signin:
-    get:
-      summary: Initiate Google OAuth sign‑in
-      description: |
-        Redirect the client to Google's OAuth consent page to start
-        the authentication flow.  The server constructs an
-        authorization request using the client ID defined in the
-        `GOOGLE_CLIENT_ID` environment variable and the redirect URI
-        defined in `GOOGLE_REDIRECT_URI`.  On success the
-        response is a 302 redirect to Google.  No authentication is
-        required to call this endpoint.
-      responses:
-        '302':
-          description: Redirect to Google for user consent
-          headers:
-            Location:
-              description: URL of the Google authorization endpoint
-              schema:
-                type: string
-
-  /oauth/callback:
-    get:
-      summary: Complete Google OAuth callback
-      description: |
-        Google redirects back to this endpoint after the user grants
-        permission.  The server exchanges the authorization code for
-        access tokens and stores session information in Deno KV.  On
-        success the response is a redirect back to the application
-        root.  The server also sets a signed session cookie that
-        identifies the authenticated user.
-      responses:
-        '302':
-          description: Redirect back to the application after completing OAuth
-          headers:
-            Set-Cookie:
-              description: Session cookie containing an opaque session ID
-              schema:
-                type: string
-
-  /oauth/signout:
-    get:
-      summary: Sign out the current user
-      description: |
-        Invalidate the current session by removing it from Deno KV and
-        clearing the session cookie.  Always succeeds whether or not
-        a session exists.
-      responses:
-        '204':
-          description: Session cleared
-
-  /session:
-    get:
-      summary: Retrieve the current session identifier
-      description: |
-        Return the opaque session ID for the current user if logged in.
-        If no session is active the `sessionId` property will be
-        `null`.  Clients can use this endpoint to determine whether
-        they are authenticated.
-      responses:
-        '200':
-          description: Session information
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  sessionId:
-                    type: string
-                    nullable: true
-
-    # Schema used when creating or updating a player.  The `id` field is
-    # omitted because it is generated by the server.
     NewPlayer:
       type: object
       properties:
@@ -401,3 +878,188 @@ components:
         - positionPreferenceRank
         - startingPositionIds
         - benchIds
+    Team:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - name
+    NewTeam:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+        - name
+    Position:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        startingPlayer:
+          type: string
+          nullable: true
+        periodId:
+          type: string
+          nullable: true
+        positionType:
+          type: string
+          nullable: true
+        fitScores:
+          type: object
+          additionalProperties:
+            type: number
+        candidates:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - name
+    NewPosition:
+      type: object
+      properties:
+        name:
+          type: string
+        startingPlayer:
+          type: string
+          nullable: true
+        periodId:
+          type: string
+          nullable: true
+        positionType:
+          type: string
+          nullable: true
+        fitScores:
+          type: object
+          additionalProperties:
+            type: number
+        candidates:
+          type: array
+          items:
+            type: string
+      required:
+        - name
+    Game:
+      type: object
+      properties:
+        id:
+          type: string
+        opponent:
+          type: string
+          nullable: true
+        datetime:
+          type: string
+          format: date-time
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+      required:
+        - id
+    NewGame:
+      type: object
+      properties:
+        opponent:
+          type: string
+          nullable: true
+        datetime:
+          type: string
+          format: date-time
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+      additionalProperties: false
+    Period:
+      type: object
+      properties:
+        id:
+          type: string
+        gameId:
+          type: string
+        number:
+          type: integer
+        startTime:
+          type: string
+          format: date-time
+          nullable: true
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - gameId
+        - number
+    NewPeriod:
+      type: object
+      properties:
+        gameId:
+          type: string
+        number:
+          type: integer
+        startTime:
+          type: string
+          format: date-time
+          nullable: true
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - gameId
+        - number
+    Lineup:
+      type: object
+      properties:
+        id:
+          type: string
+        teamId:
+          type: string
+        gameId:
+          type: string
+        periodId:
+          type: string
+          nullable: true
+        assignments:
+          type: object
+          additionalProperties:
+            type: string
+          description: Mapping from positionId to playerId
+      required:
+        - id
+        - teamId
+        - gameId
+        - assignments
+    NewLineup:
+      type: object
+      properties:
+        teamId:
+          type: string
+        gameId:
+          type: string
+        periodId:
+          type: string
+          nullable: true
+        assignments:
+          type: object
+          additionalProperties:
+            type: string
+          description: Mapping from positionId to playerId
+      required:
+        - teamId
+        - gameId
+        - assignments
