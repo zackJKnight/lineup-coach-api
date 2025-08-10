@@ -1,0 +1,7 @@
+{
+  "imports": {
+    "oak": "https://deno.land/x/oak@v12.6.1/mod.ts",
+    "djwt/create": "https://deno.land/x/djwt@v2.8/create.ts",
+    "djwt/validate": "https://deno.land/x/djwt@v2.8/validate.ts"
+  }
+}

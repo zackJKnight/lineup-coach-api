@@ -1,0 +1,113 @@
+openapi: 3.1.0
+info:
+  title: Token Service API
+  version: 1.0.0
+  description: |
+    This OpenAPI specification describes a simple JWT‑based token service
+    implemented with the [Oak](https://deno.land/x/oak) framework for
+    Deno.  Clients can obtain a signed JSON Web Token (JWT) by
+    supplying a username to the **POST /token** endpoint.  The
+    returned token must then be supplied as a bearer credential when
+    calling protected endpoints.  A valid token allows access to
+    **GET /protected**, which simply returns a greeting.  The token is
+    signed using the HS256 algorithm and expires after one hour.
+servers:
+  - url: https://{baseUrl}
+    description: Deployed service endpoint
+    variables:
+      baseUrl:
+        default: your‑project.deno.dev
+        description: Replace with your actual Deno Deploy domain
+paths:
+  /token:
+    post:
+      summary: Generate a JWT
+      description: |
+        Issue a new JSON Web Token.  The server accepts a JSON body
+        containing a `username` and optional `password`.  The password
+        is ignored in this demonstration implementation.  On success
+        the response includes a signed JWT that expires after one
+        hour.  If the `username` is missing or invalid the server
+        returns a 400 error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  description: Identifier of the user requesting the token
+                password:
+                  type: string
+                  description: Optional password (ignored)
+              required:
+                - username
+            example:
+              username: alice
+              password: secret
+      responses:
+        '200':
+          description: Token successfully generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: The signed JWT
+              example:
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '400':
+          description: Missing or invalid username
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Missing or invalid username
+  /protected:
+    get:
+      summary: Access a protected resource
+      description: |
+        Retrieve a protected resource.  This endpoint requires an
+        `Authorization` header containing a bearer token obtained from
+        **POST /token**.  If the token is valid and not expired the
+        server responds with a greeting.  Otherwise a 401 error is
+        returned.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Successful response with a greeting
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: Access granted: you are authorized
+        '401':
+          description: Invalid or missing token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Invalid or expired token
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

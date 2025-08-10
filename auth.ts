@@ -1,0 +1,78 @@
+/**
+ * Authentication utilities for creating and verifying JWTs.
+ *
+ * This module exports helper functions that encapsulate the
+ * underlying JWT library (`djwt`). It exposes a `generateToken`
+ * function for signing new tokens and a `verifyToken` function
+ * for validating incoming tokens.
+ */
+
+import {
+  makeJwt,
+  setExpiration,
+  type Jose,
+  type Payload,
+  validateJwt,
+} from "../deps.ts";
+
+// HS256 is used for signing tokens.  In a production application
+// you should provide a strong secret via an environment variable.  For
+// demonstration purposes, we fall back to a hard‑coded string when
+// `JWT_SECRET` is undefined.
+const secret = Deno.env.get("JWT_SECRET") ?? "super‑secret‑key";
+
+// Tokens are signed using a CryptoKey created from the secret.  Deno
+// exposes the Web Crypto API, which we use here.  Each call to
+// `importKey` returns a promise because key generation happens
+// asynchronously.
+async function getKey(): Promise<CryptoKey> {
+  return await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"],
+  );
+}
+
+/**
+ * Generate a signed JWT for a given user identifier.
+ *
+ * The returned token uses the HS256 algorithm and includes an
+ * expiration claim set one hour in the future.  The tutorial on
+ * generating JWTs shows how the `makeJwt` and `setExpiration`
+ * functions are used to build tokens with a payload and header【660786321715216†L115-L130】.
+ *
+ * @param username – the subject for whom the token is issued
+ * @returns a promise that resolves to the JWT string
+ */
+export async function generateToken(username: string): Promise<string> {
+  const header: Jose = { alg: "HS256", typ: "JWT" };
+  // `setExpiration` accepts a timestamp in milliseconds and returns
+  // a UNIX epoch value representing seconds.  It simplifies
+  // constructing the `exp` claim【660786321715216†L115-L130】.
+  const payload: Payload = {
+    iss: username,
+    exp: setExpiration(new Date().getTime() + 60 * 60 * 1000),
+  };
+  const key = await getKey();
+  const jwt = await makeJwt({ header, payload, key });
+  return jwt;
+}
+
+/**
+ * Verify a JWT's signature and expiry.
+ *
+ * On success the promise resolves to `true`; otherwise it resolves
+ * to `false`.  The `validateJwt` function returns an object
+ * containing an `isValid` property that indicates whether the token
+ * passed signature verification and has not expired【660786321715216†L133-L150】.
+ *
+ * @param token – the JWT to verify
+ * @returns a promise that resolves to a boolean indicating validity
+ */
+export async function verifyToken(token: string): Promise<boolean> {
+  const key = await getKey();
+  const result = await validateJwt(token, key, { isThrowing: false });
+  return result.isValid;
+}
