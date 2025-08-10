@@ -296,7 +296,8 @@ components:
         Redirect the client to Google's OAuth consent page to start
         the authentication flow.  The server constructs an
         authorization request using the client ID defined in the
-        `GOOGLE_CLIENT_ID` environment variable.  On success the
+        `GOOGLE_CLIENT_ID` environment variable and the redirect URI
+        defined in `GOOGLE_REDIRECT_URI`.  On success the
         response is a 302 redirect to Google.  No authentication is
         required to call this endpoint.
       responses:

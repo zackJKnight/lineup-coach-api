@@ -40,9 +40,18 @@ const router = new Router();
 // which completes the handshake and stores an opaque session ID in a
 // signed cookie.  The helper functions automatically read the
 // `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` environment variables.
-// See the Deno KV OAuth documentation for a list of supported providers
-//【646283931785072†L323-L347】.
-const googleOAuthConfig = createGoogleOAuthConfig();
+//
+// NOTE: `createGoogleOAuthConfig` requires a `redirectUri` and `scope`.  We
+// read the redirect URI from an environment variable `GOOGLE_REDIRECT_URI`
+// so that it can be set per‑environment (e.g. your production domain vs
+// local testing).  A typical value for production is
+// `https://<your‑project>.deno.dev/oauth/callback`.  The scope
+// determines which Google APIs are requested; `openid email profile`
+// provides basic identity information.
+const googleOAuthConfig = createGoogleOAuthConfig({
+  redirectUri: Deno.env.get("GOOGLE_REDIRECT_URI") ?? "",
+  scope: ["openid", "email", "profile"],
+});
 const {
   signIn: googleSignIn,
   handleCallback: googleHandleCallback,

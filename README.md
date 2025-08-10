@@ -202,13 +202,15 @@ following environment variables when running the server:
 ```
 export GOOGLE_CLIENT_ID=<your-google-client-id>
 export GOOGLE_CLIENT_SECRET=<your-google-client-secret>
+export GOOGLE_REDIRECT_URI=<https://your-project.deno.dev/oauth/callback>
 ```
 
-Both values can be obtained by registering an OAuth application at
-<https://console.cloud.google.com/apis/credentials> and configuring
-the authorised redirect URI to point to `/oauth/callback` on your
-deployment domain.  When these variables are present the server
-exposes the following routes:
+The client ID and secret can be obtained by registering an OAuth
+application at <https://console.cloud.google.com/apis/credentials>.  In
+addition you must set `GOOGLE_REDIRECT_URI` to the exact callback
+URL configured in your Google credentials.  A typical value for
+Deno Deploy is `https://<your-project>.deno.dev/oauth/callback`.
+When these variables are present the server exposes the following routes:
 
 * `GET /oauth/signin` – Redirects the client to Google’s authorisation
   page.  Calling this endpoint initiates the OAuth flow.  The URL is
