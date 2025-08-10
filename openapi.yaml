@@ -100,7 +100,8 @@ paths:
                   message:
                     type: string
               example:
-                message: Access granted: you are authorized
+                # YAML values containing a colon must be quoted to avoid parser errors
+                message: "Access granted: you are authorized"
         '401':
           description: Invalid or missing token
           content:
