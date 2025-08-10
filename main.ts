@@ -272,6 +272,59 @@ router.get("/session", async (ctx: Context) => {
   ctx.response.body = { sessionId };
 });
 
+// ---------------------------------------------------------------------------
+// OpenAPI specification and Swagger UI
+//
+// Expose the raw OpenAPI YAML file at `/openapi.yaml` so that clients
+// can retrieve the specification directly.  The file is read from
+// the filesystem at runtime.  When serving the spec we set a
+// `Content-Type` of `text/yaml` to hint that the body contains YAML.
+router.get("/openapi.yaml", async (ctx: Context) => {
+  try {
+    // Resolve the path relative to this file.  On Deno Deploy and
+    // locally the working directory is the project root, so this
+    // reads the `openapi.yaml` file packaged with the code.
+    const spec = await Deno.readTextFile("./openapi.yaml");
+    ctx.response.headers.set("Content-Type", "text/yaml");
+    ctx.response.body = spec;
+  } catch (err) {
+    console.error("Failed to read openapi.yaml", err);
+    ctx.response.status = 500;
+    ctx.response.body = { error: "Unable to load OpenAPI specification" };
+  }
+});
+
+// Serve an interactive Swagger UI at `/docs`.  This endpoint returns
+// an HTML page that loads the Swagger UI assets from a public CDN
+// and configures it to fetch the API definition from `/openapi.yaml`.
+// Users can visit `/docs` in a browser to explore and test the API.
+router.get("/docs", (ctx: Context) => {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>API Docs</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" />
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+      window.onload = () => {
+        SwaggerUIBundle({
+          url: '/openapi.yaml',
+          dom_id: '#swagger-ui',
+          presets: [SwaggerUIBundle.presets.apis],
+          layout: 'BaseLayout'
+        });
+      };
+    </script>
+  </body>
+</html>`;
+  ctx.response.headers.set("Content-Type", "text/html");
+  ctx.response.body = html;
+});
+
 const app = new Application();
 app.use(router.routes());
 app.use(router.allowedMethods());

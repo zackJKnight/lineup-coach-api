@@ -49,8 +49,13 @@ token is valid, the request proceeds; otherwise the server
 returns a 401 error.
 
 The OpenAPI specification describing these endpoints can be found in
-[`openapi.yaml`](./openapi.yaml).  This file can be imported into API
-development tools such as Swagger UI or Postman.
+[`openapi.yaml`](./openapi.yaml).  This file defines all routes,
+parameters and schemas for the service.  When running the server it is
+exposed at `/openapi.yaml` so you can download it directly.  For
+convenience the project also serves a live Swagger UI at `/docs` that
+loads the specification from `/openapi.yaml` and lets you interact
+with the API right in the browser.  You can still import the spec into
+other tools like Postman if you prefer.
 
 ## Project layout
 
@@ -239,8 +244,8 @@ will need to replace the `project` field in
 
 To deploy manually:
 
-1. Create a new project in Deno Deploy and choose “Import from the
-   GitHubs.”
+1. Create a new project in Deno Deploy and choose “Import from
+   GitHub.”
 2. Select your repository and branch.  Deno Deploy will detect the
    entrypoint (`main.ts`) and automatically deploy it.  Commits to
    the `main` branch will trigger new deployments.
@@ -261,4 +266,4 @@ see the [Deno Deploy documentation](https://docs.deno.com/deploy/manual/ci_githu
 This project is provided for educational and demonstration purposes.  It
 shows how to build a small API with token issuance, persistent
 storage via Deno KV, and federated login via Google OAuth.  It is
-licensed under the MIT License.
+licensed under the MIT License..
