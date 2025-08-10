@@ -1,0 +1,44 @@
+name: Deploy
+
+# This workflow automatically deploys the service to Deno Deploy whenever
+# changes are pushed to the `main` branch or a pull request targeting
+# `main` is opened.  The job installs Deno, then invokes the
+# `deployctl` GitHub Action to upload the project.  The configuration
+# below follows the template provided in the Deno Deploy documentation【509367563234816†L166-L201】.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write   # Required for authentication with Deno Deploy【509367563234816†L180-L183】
+      contents: read    # Required to clone the repository【509367563234816†L180-L183】
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # Run your own build step here if your project requires a
+      # compilation or bundling step.  For this example there is no
+      # build step because the code runs directly in Deno.
+
+      - name: Upload to Deno Deploy
+        uses: denoland/deployctl@v1
+        with:
+          # Name of your Deno Deploy project.  This has been set
+          # automatically based on user input.
+          project: lineup-coach-api
+          entrypoint: main.ts
+          root: .
