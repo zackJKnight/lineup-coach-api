@@ -1,6 +1,7 @@
 {
   "imports": {
     "oak": "https://deno.land/x/oak@v12.6.1/mod.ts",
-    "djwt/mod": "https://deno.land/x/djwt@v2.8/mod.ts"
+    "djwt/mod": "https://deno.land/x/djwt@v2.8/mod.ts",
+    "kv_oauth": "jsr:@deno/kv-oauth@0.11.0"
   }
 }

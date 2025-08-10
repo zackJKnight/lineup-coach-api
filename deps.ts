@@ -24,3 +24,14 @@ export {
   type Header,
   type Payload,
 } from "djwt/mod";
+
+// OAuth helpers for Google sign‑in.  The `kv_oauth` package exposes a
+// high‑level API for performing OAuth 2.0 flows using Deno KV for
+// session storage.  We import the Google configuration and helper
+// factory so that the main application can expose sign‑in and
+// callback routes.  See the Deno KV OAuth documentation for details
+// on the available providers【646283931785072†L323-L347】.
+export {
+  createGoogleOAuthConfig,
+  createHelpers,
+} from "kv_oauth";

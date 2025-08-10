@@ -8,7 +8,7 @@
  * tokens.
  */
 
-import { Application, Router, type Context } from "./deps.ts";
+import { Application, Router, type Context, createGoogleOAuthConfig, createHelpers } from "./deps.ts";
 // Import the token helpers from the top‑level auth module instead of the utils
 // directory.  The utils folder is not used in this simplified project structure.
 import { generateToken, verifyToken } from "./auth.ts";
@@ -28,6 +28,27 @@ function extractBearerToken(authHeader: string | null): string | undefined {
 }
 
 const router = new Router();
+
+// ---------------------------------------------------------------------------
+// Google OAuth integration
+//
+// The @deno/kv-oauth package provides helpers for performing OAuth 2.0
+// authorization flows and storing session information in Deno KV.  Here we
+// configure Google as our identity provider.  When users visit
+// `/oauth/signin` they will be redirected to Google's consent page.  After
+// authorizing the application Google redirects back to `/oauth/callback`
+// which completes the handshake and stores an opaque session ID in a
+// signed cookie.  The helper functions automatically read the
+// `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` environment variables.
+// See the Deno KV OAuth documentation for a list of supported providers
+//【646283931785072†L323-L347】.
+const googleOAuthConfig = createGoogleOAuthConfig();
+const {
+  signIn: googleSignIn,
+  handleCallback: googleHandleCallback,
+  getSessionId: googleGetSessionId,
+  signOut: googleSignOut,
+} = createHelpers(googleOAuthConfig);
 
 // Open a connection to Deno KV.  When running on Deno Deploy this
 // returns a handle to a globally distributed, strongly consistent
@@ -179,6 +200,76 @@ router.delete("/players/:id", async (ctx: Context) => {
   }
   await kv.delete(["players", id]);
   ctx.response.status = 204;
+});
+
+// ---------------------------------------------------------------------------
+// OAuth routes
+//
+// Initiate a Google sign‑in by redirecting the client to Google.  The
+// `googleSignIn` helper constructs an OAuth authorization request and
+// returns a `Response` object containing a 302 redirect.  We convert the
+// helper's response into Oak's response format by copying the status,
+// headers and body.  No authentication is required to call this
+// endpoint.
+router.get("/oauth/signin", async (ctx: Context) => {
+  const request = new Request(ctx.request.url.href, {
+    method: ctx.request.method,
+    headers: ctx.request.headers,
+  });
+  const response = await googleSignIn(request);
+  ctx.response.status = response.status;
+  // copy headers (e.g. Location) to redirect the browser
+  response.headers.forEach((value, key) => ctx.response.headers.set(key, value));
+  // forward the response body if present
+  const text = await response.text();
+  if (text) ctx.response.body = text;
+});
+
+// Handle the OAuth callback from Google.  After the user grants
+// permission Google redirects back to this endpoint with a code.  The
+// `googleHandleCallback` helper exchanges the code for tokens, stores
+// the session information in Deno KV and returns a response (usually a
+// 302 redirect to the root).  We again copy the status, headers and
+// body to the Oak response.  Clients should preserve the cookies set
+// by this response for subsequent requests.
+router.get("/oauth/callback", async (ctx: Context) => {
+  const request = new Request(ctx.request.url.href, {
+    method: ctx.request.method,
+    headers: ctx.request.headers,
+  });
+  const { response } = await googleHandleCallback(request);
+  ctx.response.status = response.status;
+  response.headers.forEach((value, key) => ctx.response.headers.set(key, value));
+  const text = await response.text();
+  if (text) ctx.response.body = text;
+});
+
+// Sign the user out by deleting the session from Deno KV and clearing
+// the session cookie.  This endpoint always succeeds.
+router.get("/oauth/signout", async (ctx: Context) => {
+  const request = new Request(ctx.request.url.href, {
+    method: ctx.request.method,
+    headers: ctx.request.headers,
+  });
+  const response = await googleSignOut(request);
+  ctx.response.status = response.status;
+  response.headers.forEach((value, key) => ctx.response.headers.set(key, value));
+  const text = await response.text();
+  if (text) ctx.response.body = text;
+});
+
+// Retrieve the current session identifier.  The `googleGetSessionId`
+// helper reads the session cookie and returns the associated session ID
+// or `undefined` if no session is active.  This endpoint does not
+// return any sensitive information; it simply exposes whether the
+// client is authenticated.
+router.get("/session", async (ctx: Context) => {
+  const request = new Request(ctx.request.url.href, {
+    method: ctx.request.method,
+    headers: ctx.request.headers,
+  });
+  const sessionId = await googleGetSessionId(request);
+  ctx.response.body = { sessionId };
 });
 
 const app = new Application();

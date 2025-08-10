@@ -2,17 +2,26 @@
 
 This repository implements a minimal JSON Web Token (JWT) service
 written in [TypeScript](https://www.typescriptlang.org/) for the
-[Deno](https://deno.com/) runtime **and** a simple CRUD API for
-managing player data.  Originally the project exposed only a `/token`
-endpoint for generating tokens and a `/protected` endpoint that
-required a valid token to access.  It has since been extended with a
-`/players` resource backed by the built‑in [Deno KV
-database](https://docs.deno.com/deploy/kv/manual/on_deploy) which
-persists JSON objects in a globally replicated key‑value store.
+[Deno](https://deno.com/) runtime.  Beyond token issuance, the
+project now includes a simple CRUD API for managing player data
+**and** Google sign‑in via OAuth.  Originally the project exposed only
+a `/token` endpoint for generating tokens and a `/protected` endpoint
+that required a valid token to access.  It has since been extended
+with:
+
+* a `/players` resource backed by the built‑in [Deno KV
+  database](https://docs.deno.com/deploy/kv/manual/on_deploy) which
+  persists JSON objects in a globally replicated key‑value store; and
+* OAuth endpoints for Google sign‑in that use the
+  [`@deno/kv‑oauth`](https://deno.land/x/kv_oauth) library to store
+  session state in Deno KV and manage the OAuth2 authorization code
+  flow.
 
 The service uses the [Oak](https://deno.land/x/oak) web framework
 for routing, [djwt](https://deno.land/x/djwt) for signing and
-verifying JWTs, and the native `Deno.openKv()` API for persistence.
+verifying JWTs, the native `Deno.openKv()` API for persistence, and
+[`@deno/kv‑oauth`](https://deno.land/x/kv_oauth) for handling OAuth2
+flows (Google in this example).
 
 ## Why version‑pinned imports?
 
@@ -29,14 +38,14 @@ breakages caused by upstream changes【926774900134672†L185-L199】.
 
 The service uses the `djwt` library to create and validate tokens.
 Tokens are signed using the HS256 algorithm, and an expiration claim
-is set one hour in the future.  The `makeJwt` function builds the
-token from a header and payload, while `setExpiration` converts a
-timestamp into a numeric date suitable for the `exp` claim【660786321715216†L115-L130】.
-When a client calls the `/token` endpoint with a JSON body containing
-a `username`, the server responds with a signed JWT.  To protect a
+is set one hour in the future.  The `create` function builds the
+token from a header and payload, while `getNumericDate` converts a
+timestamp into a numeric date suitable for the `exp` claim.  When a
+client calls the `/token` endpoint with a JSON body containing a
+`username`, the server responds with a signed JWT.  To protect a
 route, the server checks the `Authorization` header and uses
-`validateJwt` to verify the token’s signature and expiration【660786321715216†L133-L150】.
-If the token is valid, the request proceeds; otherwise the server
+`verify` to validate the token’s signature and expiration.  If the
+token is valid, the request proceeds; otherwise the server
 returns a 401 error.
 
 The OpenAPI specification describing these endpoints can be found in
@@ -76,7 +85,9 @@ This will start an HTTP server on port `8000` (or the value of the
 `PORT` environment variable).  The `-A` flag grants all necessary
 permissions (network and environment).  You can override the secret
 used to sign tokens by setting the `JWT_SECRET` environment variable
-before running the server.
+before running the server.  To enable Google sign‑in locally you must
+also set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as described in
+the [Google sign‑in](#google-sign‑in-oauth) section.
 
 ### Example: obtain and use a token
 
@@ -174,6 +185,48 @@ These endpoints do not require authentication.  In a real
 application you would typically protect them with JWTs by adding
 middleware similar to the `/protected` route.
 
+### Google sign‑in (OAuth)
+
+In addition to JWT‑based authentication, this project supports
+federated login with Google.  The OAuth endpoints are built using
+the [@deno/kv‑oauth](https://deno.land/x/kv_oauth) library, which
+stores session state in Deno KV and implements the secure
+authorization‑code flow.  To enable Google sign‑in you must set the
+following environment variables when running the server:
+
+```
+export GOOGLE_CLIENT_ID=<your-google-client-id>
+export GOOGLE_CLIENT_SECRET=<your-google-client-secret>
+```
+
+Both values can be obtained by registering an OAuth application at
+<https://console.cloud.google.com/apis/credentials> and configuring
+the authorised redirect URI to point to `/oauth/callback` on your
+deployment domain.  When these variables are present the server
+exposes the following routes:
+
+* `GET /oauth/signin` – Redirects the client to Google’s authorisation
+  page.  Calling this endpoint initiates the OAuth flow.  The URL is
+  generated for you; no parameters are needed.
+* `GET /oauth/callback` – Handles the redirect from Google after the
+  user grants permission.  This endpoint should be configured as the
+  redirect URI in your Google API console.  After exchanging the
+  authorisation code for tokens, the session is stored in Deno KV and
+  the helper returns a response to the browser.  In a real
+  application you would typically redirect or set a session cookie
+  here.
+* `GET /session` – Returns the current session identifier as JSON.  If
+  no user is logged in it returns `{ sessionId: null }`.
+* `GET /oauth/signout` – Clears the session from Deno KV and
+  effectively logs the user out.
+
+The `/session` and `/oauth/signout` endpoints are useful for checking
+the user’s login status and implementing a sign‑out button in your
+frontend.  These routes do not currently protect any resources; they
+only demonstrate integration with Google.  For a production
+application you would typically use the session ID to look up user
+details and authorise access to other endpoints.
+
 ## Deploying to Deno Deploy
 
 This project can be deployed to [Deno Deploy](https://deno.com/deploy)
@@ -205,6 +258,7 @@ see the [Deno Deploy documentation](https://docs.deno.com/deploy/manual/ci_githu
 
 ## License
 
-This project is provided for demonstration purposes and does not
-include any authentication or persistence beyond token generation.  It
-is licensed under the MIT License.
+This project is provided for educational and demonstration purposes.  It
+shows how to build a small API with token issuance, persistent
+storage via Deno KV, and federated login via Google OAuth.  It is
+licensed under the MIT License.
