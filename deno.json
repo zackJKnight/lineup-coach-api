@@ -1,0 +1,6 @@
+{
+  // Specify the import map for this project.  Deno Deploy will
+  // automatically detect this file and use it when resolving
+  // module specifiers.  See https://deno.land/manual/linking_to_external_code/import_maps
+  "importMap": "import_map.json"
+}
