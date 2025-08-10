@@ -11,15 +11,16 @@
 
 export { Application, Router, type Context } from "oak";
 
-// The `makeJwt` and `setExpiration` functions create signed JSON Web
-// Tokens (JWTs) for our users. The `validateJwt` function checks
-// whether a supplied token is valid.  These functions are part of
-// the `djwt` module. See the tutorial on generating and validating
-// JWTs for example usage【660786321715216†L115-L130】【660786321715216†L133-L150】.
+// Import helper functions and types from djwt.  Starting with v2.x,
+// the djwt API exposes `create`, `verify`, and `getNumericDate` from
+// its `mod.ts` entrypoint.  These functions replace the older
+// `makeJwt`, `setExpiration`, and `validateJwt` helpers and provide
+// equivalent functionality for signing and verifying JWTs.  See the
+// djwt documentation for details.
 export {
-  makeJwt,
-  setExpiration,
-  type Jose,
+  create,
+  verify,
+  getNumericDate,
+  type Header,
   type Payload,
-} from "djwt/create";
-export { validateJwt } from "djwt/validate";
+} from "djwt/mod";
