@@ -652,6 +652,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Lineup'
+  /lineups/generate:
+    post:
+      summary: Generate a lineup automatically
+      description: |
+        Creates a new lineup by automatically assigning available players to positions.
+        Clients may optionally include `teamId`, `gameId` and `periodId` in the request
+        body to associate the generated lineup with a specific team, game or period.  The
+        server fetches all positions and players from storage, filters out any players whose
+        `isPresent` property is explicitly `false`, shuffles the remaining players randomly,
+        and assigns them to positions in order.  Any positions without an available player
+        are left unassigned (represented as `null`).  The generated lineup is persisted
+        and returned in the response.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateLineupRequest'
+      responses:
+        '201':
+          description: Generated lineup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lineup'
   /lineups/{id}:
     parameters:
       - in: path
@@ -1063,3 +1088,19 @@ components:
         - teamId
         - gameId
         - assignments
+    GenerateLineupRequest:
+      type: object
+      description: |
+        Request body for generating a lineup.  All fields are optional; if omitted the
+        generated lineup will not be associated with a specific team, game or period.
+      properties:
+        teamId:
+          type: string
+          description: Identifier of the team for which to generate the lineup
+        gameId:
+          type: string
+          description: Identifier of the game for which to generate the lineup
+        periodId:
+          type: string
+          description: Identifier of the period for which to generate the lineup
+      additionalProperties: false

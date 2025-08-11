@@ -248,6 +248,29 @@ curl -X POST http://localhost:8000/lineups \
 All management endpoints are unauthenticated by default for simplicity,
 but you can add middleware to protect them using JWTs if needed.
 
+#### Generate a lineup automatically
+
+Sometimes you want the server to pick which players should occupy each position.
+The `POST /lineups/generate` endpoint does exactly that.  It examines all
+positions and all players currently stored in Deno KV, filters out any players
+whose `isPresent` flag is explicitly `false`, shuffles the remaining players
+and assigns them to positions in order.  You can include optional
+`teamId`, `gameId` and `periodId` fields in the request body to associate the
+generated lineup with a particular team, game or period.  Any positions without an
+available player will be left unassigned (`null`).
+
+Example:
+
+```sh
+curl -X POST http://localhost:8000/lineups/generate \
+  -H "Content-Type: application/json" \
+  -d '{ "teamId": "<team-id>", "gameId": "<game-id>", "periodId": null }'
+```
+
+The response will include a newly created lineup with an `id` and an `assignments`
+object mapping each position ID to a player ID or `null`.  Use the regular
+`/lineups` endpoints to view, update or delete the generated lineup.
+
 ### Google sign‑in (OAuth)
 
 In addition to JWT‑based authentication, this project supports

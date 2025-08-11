@@ -634,6 +634,68 @@ router.delete("/lineups/:id", async (ctx: Context) => {
 });
 
 // ---------------------------------------------------------------------------
+// Generate a lineup
+//
+// This endpoint automatically creates a new lineup by assigning available
+// players to open positions.  Clients may optionally provide `teamId`,
+// `gameId` or `periodId` in the request body to associate the generated
+// lineup with a specific team, game or period.  The algorithm used here is
+// intentionally simple: it fetches all positions and players from Deno KV,
+// filters out any players whose `isPresent` flag is explicitly set to
+// `false`, shuffles the remaining players to randomise assignments and then
+// maps each position ID to a player ID.  If there are more positions than
+// available players the extra positions are left unassigned (`null`).  The
+// resulting lineup object is stored under `['lineups', <uuid>]` and
+// returned to the client.
+router.post("/lineups/generate", async (ctx: Context) => {
+  const body = ctx.request.body({ type: "json" });
+  const data = await body.value;
+  const { teamId, gameId, periodId } = data ?? {};
+
+  // Collect all positions
+  const positions: { id: string; [key: string]: unknown }[] = [];
+  for await (const entry of kv.list({ prefix: ["positions"] })) {
+    const [, posId] = entry.key as [string, string];
+    positions.push({ id: posId, ...(entry.value as Record<string, unknown>) });
+  }
+
+  // Collect all players
+  const players: { id: string; [key: string]: unknown }[] = [];
+  for await (const entry of kv.list({ prefix: ["players"] })) {
+    const [, playerId] = entry.key as [string, string];
+    players.push({ id: playerId, ...(entry.value as Record<string, unknown>) });
+  }
+
+  // Filter players who are present (isPresent !== false)
+  const available = players.filter((p) => (p as Record<string, unknown>).isPresent !== false);
+
+  // Shuffle players to randomise assignment
+  available.sort(() => Math.random() - 0.5);
+
+  // Build assignments: map positionId -> playerId or null
+  const assignments: Record<string, string | null> = {};
+  positions.forEach((pos, idx) => {
+    assignments[pos.id] = available[idx] ? String(available[idx].id) : null;
+  });
+
+  // Build the lineup object
+  const lineupId = crypto.randomUUID();
+  const lineup = {
+    teamId,
+    gameId,
+    periodId,
+    assignments,
+    createdAt: new Date().toISOString(),
+  };
+
+  // Persist the lineup
+  await kv.set(["lineups", lineupId], lineup);
+
+  ctx.response.status = 201;
+  ctx.response.body = { id: lineupId, ...lineup };
+});
+
+// ---------------------------------------------------------------------------
 // OAuth routes
 //
 // Initiate a Google sign‑in by redirecting the client to Google.  The
