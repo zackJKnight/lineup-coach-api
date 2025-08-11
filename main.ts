@@ -17,7 +17,11 @@ import { generateToken, verifyToken } from "./auth.ts";
 // a simplified version of the lineup optimisation algorithm from the
 // Angular client using a genetic algorithm.  It produces a mapping of
 // position names to player IDs based on player preferences.
-import { generateOptimisedAssignments, type SimplePlayer } from "./utils/ga.ts";
+// Import the genetic algorithm helper from the top level.  In the
+// repository layout used for deployment the GA module lives at the root
+// rather than in a utils directory, so we import it directly.  See
+// `ga.ts` for the implementation.
+import { generateOptimisedAssignments, type SimplePlayer } from "./ga.ts";
 
 /**
  * Extract the bearer token from an HTTP Authorization header.
