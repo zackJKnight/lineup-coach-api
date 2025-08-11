@@ -13,6 +13,12 @@ import { Application, Router, type Context, createGoogleOAuthConfig, createHelpe
 // directory.  The utils folder is not used in this simplified project structure.
 import { generateToken, verifyToken } from "./auth.ts";
 
+// Import the genetic algorithm helper.  This function implements
+// a simplified version of the lineup optimisation algorithm from the
+// Angular client using a genetic algorithm.  It produces a mapping of
+// position names to player IDs based on player preferences.
+import { generateOptimisedAssignments, type SimplePlayer } from "./utils/ga.ts";
+
 /**
  * Extract the bearer token from an HTTP Authorization header.
  *
@@ -669,16 +675,43 @@ router.post("/lineups/generate", async (ctx: Context) => {
   // Filter players who are present (isPresent !== false)
   const available = players.filter((p) => (p as Record<string, unknown>).isPresent !== false);
 
-  // Shuffle players to randomise assignment
-  available.sort(() => Math.random() - 0.5);
-
-  // Build assignments: map positionId -> playerId or null
-  const assignments: Record<string, string | null> = {};
-  positions.forEach((pos, idx) => {
-    assignments[pos.id] = available[idx] ? String(available[idx].id) : null;
+  // Convert available players into simple objects containing id, name
+  // and preference list.  The `name` field uses the player's
+  // firstName if present, otherwise falls back to the id.  The
+  // `pref` array reflects the player's ranked position preferences.
+  const simplePlayers: SimplePlayer[] = available.map((p) => {
+    const record = p as Record<string, unknown>;
+    const id = String(p.id);
+    const name = typeof record.firstName === "string" && record.firstName.trim() !== "" ? record.firstName : id;
+    const pref = Array.isArray(record.positionPreferenceRank?.ranking)
+      ? (record.positionPreferenceRank?.ranking as unknown as string[])
+      : [];
+    return { id, name, pref };
   });
 
-  // Build the lineup object
+  // Gather position names.  If a position has no `name` property
+  // stored in KV, fall back to its ID.  Positions are assumed to
+  // represent unique positions on the field.
+  const positionNames: string[] = positions.map((pos) => {
+    const record = pos as Record<string, unknown>;
+    const name = typeof record.name === "string" && record.name.trim() !== "" ? (record.name as string) : String(pos.id);
+    return name;
+  });
+
+  // Use the genetic algorithm to generate assignments.  The return
+  // value maps position names to player IDs.  We need to translate
+  // this mapping back to position IDs for storage.  If the GA
+  // couldn't assign a player to a position the value will be null.
+  const assignmentsByName = generateOptimisedAssignments(simplePlayers, positionNames, 1);
+  const assignments: Record<string, string | null> = {};
+  positions.forEach((pos) => {
+    const record = pos as Record<string, unknown>;
+    const name = typeof record.name === "string" && record.name.trim() !== "" ? (record.name as string) : String(pos.id);
+    const playerId = assignmentsByName[name] ?? null;
+    assignments[pos.id] = playerId ? String(playerId) : null;
+  });
+
+  // Build the lineup object with the optimised assignments.
   const lineupId = crypto.randomUUID();
   const lineup = {
     teamId,
@@ -687,10 +720,7 @@ router.post("/lineups/generate", async (ctx: Context) => {
     assignments,
     createdAt: new Date().toISOString(),
   };
-
-  // Persist the lineup
   await kv.set(["lineups", lineupId], lineup);
-
   ctx.response.status = 201;
   ctx.response.body = { id: lineupId, ...lineup };
 });

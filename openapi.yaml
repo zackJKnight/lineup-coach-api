@@ -660,10 +660,13 @@ paths:
         Clients may optionally include `teamId`, `gameId` and `periodId` in the request
         body to associate the generated lineup with a specific team, game or period.  The
         server fetches all positions and players from storage, filters out any players whose
-        `isPresent` property is explicitly `false`, shuffles the remaining players randomly,
-        and assigns them to positions in order.  Any positions without an available player
-        are left unassigned (represented as `null`).  The generated lineup is persisted
-        and returned in the response.
+        `isPresent` property is explicitly `false`, and then uses a simple genetic algorithm
+        to evolve a fair assignment.  The algorithm evaluates candidate lineups using a
+        ratio of players’ preference scores and selects the arrangement that maximises
+        fairness.  Because the algorithm incorporates randomness and evolution, successive
+        calls may produce different assignments even with identical inputs.  Any positions
+        without an available player are left unassigned (represented as `null`).  The
+        generated lineup is persisted and returned in the response.
       requestBody:
         required: false
         content:

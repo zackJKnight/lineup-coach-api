@@ -253,11 +253,17 @@ but you can add middleware to protect them using JWTs if needed.
 Sometimes you want the server to pick which players should occupy each position.
 The `POST /lineups/generate` endpoint does exactly that.  It examines all
 positions and all players currently stored in Deno KV, filters out any players
-whose `isPresent` flag is explicitly `false`, shuffles the remaining players
-and assigns them to positions in order.  You can include optional
-`teamId`, `gameId` and `periodId` fields in the request body to associate the
-generated lineup with a particular team, game or period.  Any positions without an
-available player will be left unassigned (`null`).
+whose `isPresent` flag is explicitly `false`, and then uses a **genetic
+algorithm** to find a fair assignment.  The algorithm, adapted from the
+LineupCoach client, evolves a population of random lineups and selects the
+candidate with the best fairness ratio—meaning players are generally placed
+into positions they prefer and the distribution of scores across players is
+even.  Because the algorithm uses randomness and evolution, successive calls
+to this endpoint may produce different assignments even with the same inputs.
+You can include optional `teamId`, `gameId` and `periodId` fields in the
+request body to associate the generated lineup with a particular team, game or
+period.  Any positions without an available player will be left unassigned
+(`null`).
 
 Example:
 
@@ -267,9 +273,9 @@ curl -X POST http://localhost:8000/lineups/generate \
   -d '{ "teamId": "<team-id>", "gameId": "<game-id>", "periodId": null }'
 ```
 
-The response will include a newly created lineup with an `id` and an `assignments`
-object mapping each position ID to a player ID or `null`.  Use the regular
-`/lineups` endpoints to view, update or delete the generated lineup.
+The response will include a newly created lineup with an `id` and an
+`assignments` object mapping each position ID to a player ID or `null`.  Use the
+regular `/lineups` endpoints to view, update or delete the generated lineup.
 
 ### Google sign‑in (OAuth)
 
